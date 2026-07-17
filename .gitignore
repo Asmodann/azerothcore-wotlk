@@ -118,3 +118,5 @@ __pycache__/
 #  !modules/yourmodule
 #
 # ==================
+.gitmodules
+!modules/mod-ale
