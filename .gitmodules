@@ -1,0 +1,3 @@
+[submodule "modules/mod-ale"]
+	path = modules/mod-ale
+	url = git@github.com:Asmodann/mod-ale.git
