@@ -17,8 +17,10 @@
 
 #define _CRT_SECURE_NO_DEPRECATE
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
+#include <cctype>
 #include <deque>
 #include <filesystem>
 #include <set>
@@ -107,11 +109,43 @@ const char* CONF_mpq_list[] =
     "lichking.MPQ",
     "expansion.MPQ",
     "patch.MPQ",
-    "patch-2.MPQ",
-    "patch-3.MPQ",
-    "patch-4.MPQ",
-    "patch-5.MPQ",
 };
+
+static bool IsPatchMPQArchive(const std::string& fileName)
+{
+    std::string normalized = fileName;
+    std::transform(normalized.begin(), normalized.end(), normalized.begin(), [](unsigned char ch)
+    {
+        return static_cast<char>(std::tolower(ch));
+    });
+
+    static const std::string mpqExtension = ".mpq";
+    if (normalized.size() <= mpqExtension.size())
+        return false;
+
+    if (normalized.compare(normalized.size() - mpqExtension.size(), mpqExtension.size(), mpqExtension) != 0)
+        return false;
+
+    normalized.erase(normalized.size() - mpqExtension.size(), mpqExtension.size());
+
+    if (normalized == "patch")
+        return true;
+
+    if (normalized.rfind("patch-", 0) != 0)
+        return false;
+
+    normalized.erase(0, 6);
+    if (normalized.empty())
+        return false;
+
+    if (normalized.size() == 1 && normalized[0] >= '2' && normalized[0] <= '9')
+        return true;
+
+    return std::all_of(normalized.begin(), normalized.end(), [](unsigned char ch)
+    {
+        return std::isalpha(ch) != 0;
+    });
+}
 
 static const char* const langs[] = {"enGB", "enUS", "deDE", "esES", "frFR", "koKR", "zhCN", "zhTW", "enCN", "enTW", "esMX", "ruRU" };
 #define LANG_COUNT 12
@@ -1163,12 +1197,42 @@ void LoadLocaleMPQFiles(int const locale)
 void LoadCommonMPQFiles()
 {
     char filename[512];
+    std::set<std::string> loadedArchives;
+
+    auto loadArchive = [&](const std::string& archivePath)
+    {
+        if (loadedArchives.find(archivePath) != loadedArchives.end())
+            return;
+
+        if (FileExists(archivePath.c_str()))
+        {
+            new MPQArchive(archivePath.c_str());
+            loadedArchives.insert(archivePath);
+        }
+    };
+
     int count = sizeof(CONF_mpq_list) / sizeof(char*);
     for (int i = 0; i < count; ++i)
     {
         sprintf(filename, "%s/Data/%s", input_path, CONF_mpq_list[i]);
-        if (FileExists(filename))
-            new MPQArchive(filename);
+        loadArchive(filename);
+    }
+
+    const std::filesystem::path dataDirectory = std::filesystem::path(input_path) / "Data";
+    if (std::filesystem::exists(dataDirectory) && std::filesystem::is_directory(dataDirectory))
+    {
+        for (const auto& entry : std::filesystem::directory_iterator(dataDirectory))
+        {
+            if (!entry.is_regular_file())
+                continue;
+
+            const std::string archiveName = entry.path().filename().string();
+            if (!IsPatchMPQArchive(archiveName))
+                continue;
+
+            const std::string archivePath = entry.path().string();
+            loadArchive(archivePath);
+        }
     }
 }
 
