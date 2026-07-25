@@ -130,6 +130,7 @@ enum PlayerHook
     PLAYERHOOK_CAN_GROUP_ACCEPT,
     PLAYERHOOK_CAN_SELL_ITEM,
     PLAYERHOOK_CAN_SEND_MAIL,
+    PLAYERHOOK_CAN_BUY_BARBER_STYLE,
     PLAYERHOOK_PETITION_BUY,
     PLAYERHOOK_PETITION_SHOW_LIST,
     PLAYERHOOK_ON_REWARD_KILL_REWARDER,
@@ -615,6 +616,8 @@ public:
     [[nodiscard]] virtual bool OnPlayerNotSetArenaTeamInfoField(Player* /*player*/, uint8 /*slot*/, ArenaTeamInfoType /*type*/, uint32 /*value*/) { return true; } // Whats that?
 
     [[nodiscard]] virtual bool OnPlayerCanJoinLfg(Player* /*player*/, uint8 /*roles*/, std::set<uint32>& /*dungeons*/, const std::string& /*comment*/) { return true; }
+
+    [[nodiscard]] virtual bool OnPlayerCanBuyBarberStyle(Player* /*player*/, uint32 /*cost*/, uint32 /*hair*/, uint32 /*color*/, uint32 /*facialHair*/, uint32 /*skinColor*/) { return true; }
 
     [[nodiscard]] virtual bool OnPlayerCanEnterMap(Player* /*player*/, MapEntry const* /*entry*/, InstanceTemplate const* /*instance*/, MapDifficulty const* /*mapDiff*/, bool /*loginCheck*/) { return true; }
 

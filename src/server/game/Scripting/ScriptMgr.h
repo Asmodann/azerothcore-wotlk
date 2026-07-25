@@ -393,6 +393,7 @@ public: /* PlayerScript */
     bool OnPlayerCanGroupAccept(Player* player, Group* group);
     bool OnPlayerCanSellItem(Player* player, Item* item, Creature* creature);
     bool OnPlayerCanSendMail(Player* player, ObjectGuid receiverGuid, ObjectGuid mailbox, std::string& subject, std::string& body, uint32 money, uint32 COD, Item* item);
+    bool OnPlayerCanBuyBarberStyle(Player* player, uint32 cost, uint32 hair, uint32 color, uint32 facialHair, uint32 skinColor);
     void OnPlayerPetitionBuy(Player* player, Creature* creature, uint32& charterid, uint32& cost, uint32& type);
     void OnPlayerPetitionShowList(Player* player, Creature* creature, uint32& CharterEntry, uint32& CharterDispayID, uint32& CharterCost);
     void OnPlayerRewardKillRewarder(Player* player, KillRewarder* rewarder, bool isDungeon, float& rate);

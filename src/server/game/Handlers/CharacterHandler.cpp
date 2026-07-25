@@ -1560,6 +1560,14 @@ void WorldSession::HandleAlterAppearance(WorldPacket& recvData)
 
     uint32 cost = _player->GetBarberShopCost(bs_hair->hair_id, Color, bs_facialHair->hair_id, bs_skinColor);
 
+    if (!sScriptMgr->OnPlayerCanBuyBarberStyle(_player, cost, Hair, Color, FacialHair, SkinColor))
+    {
+        WorldPacket data(SMSG_BARBER_SHOP_RESULT, 4);
+        data << uint32(1);
+        SendPacket(&data);
+        return;
+    }
+
     // 0 - ok
     // 1, 3 - not enough money
     // 2 - you have to seat on barber chair
@@ -1570,7 +1578,7 @@ void WorldSession::HandleAlterAppearance(WorldPacket& recvData)
         SendPacket(&data);
         return;
     }
-    else
+
     {
         WorldPacket data(SMSG_BARBER_SHOP_RESULT, 4);
         data << uint32(0);                                  // ok

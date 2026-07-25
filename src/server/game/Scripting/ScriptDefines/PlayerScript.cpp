@@ -522,6 +522,11 @@ bool ScriptMgr::OnPlayerCanSendMail(Player* player, ObjectGuid receiverGuid, Obj
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SEND_MAIL, !script->OnPlayerCanSendMail(player, receiverGuid, mailbox, subject, body, money, COD, item));
 }
 
+bool ScriptMgr::OnPlayerCanBuyBarberStyle(Player* player, uint32 cost, uint32 hair, uint32 color, uint32 facialHair, uint32 skinColor)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_BUY_BARBER_STYLE, !script->OnPlayerCanBuyBarberStyle(player, cost, hair, color, facialHair, skinColor));
+}
+
 bool ScriptMgr::OnPlayerCanSendErrorAlreadyLooted(Player* player)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SEND_ERROR_ALREADY_LOOTED, !script->OnPlayerCanSendErrorAlreadyLooted(player));
