@@ -25,10 +25,12 @@
 #include "LootMgr.h"
 #include "Unit.h"
 #include <list>
+#include <memory>
 
 class SpellInfo;
 
 class CreatureAI;
+class CreatureOutfit;
 class Quest;
 class Player;
 class WorldSession;
@@ -55,7 +57,16 @@ public:
     float GetNativeObjectScale() const override;
     void SetObjectScale(float scale) override;
     void SetDisplayId(uint32 displayId, float displayScale = 1.f) override;
+    [[nodiscard]] uint32 GetDisplayId() const override;
+    void SetDisplayIdRaw(uint32 displayId, float displayScale = 1.f);
     void SetDisplayFromModel(uint32 modelIdx);
+
+    // "Dress NPC" outfit system: makes the creature use a Player-style appearance
+    // (race/gender/skin/face/hair + full visible equipment) via the Mirror Image protocol.
+    [[nodiscard]] std::shared_ptr<CreatureOutfit> const& GetOutfit() const { return m_outfit; }
+    void SetOutfit(std::shared_ptr<CreatureOutfit> const& outfit);
+    void SetMirrorImageFlag(bool on);
+    void SendMirrorSound(Player* target, uint8 type);
 
     void DisappearAndDie();
 
@@ -493,6 +504,8 @@ protected:
     ObjectGuid::LowType m_spawnId;                      ///< For new or temporary creatures is 0 for saved it is lowguid
     uint8 m_equipmentId;
     int8 m_originalEquipmentId; // can be -1
+
+    std::shared_ptr<CreatureOutfit> m_outfit;
 
     bool m_alreadyCallForHelp;
     bool m_AlreadyCallAssistance;

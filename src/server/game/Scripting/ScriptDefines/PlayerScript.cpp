@@ -522,6 +522,11 @@ bool ScriptMgr::OnPlayerCanSendMail(Player* player, ObjectGuid receiverGuid, Obj
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SEND_MAIL, !script->OnPlayerCanSendMail(player, receiverGuid, mailbox, subject, body, money, COD, item));
 }
 
+bool ScriptMgr::OnPlayerCanBuyBarberStyle(Player* player, uint32 cost, uint32 hair, uint32 color, uint32 facialHair, uint32 skinColor)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_BUY_BARBER_STYLE, !script->OnPlayerCanBuyBarberStyle(player, cost, hair, color, facialHair, skinColor));
+}
+
 bool ScriptMgr::OnPlayerCanSendErrorAlreadyLooted(Player* player)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SEND_ERROR_ALREADY_LOOTED, !script->OnPlayerCanSendErrorAlreadyLooted(player));
@@ -700,6 +705,11 @@ bool ScriptMgr::OnPlayerCanUnequipItem(Player* player, uint16 pos, bool swap)
 bool ScriptMgr::OnPlayerCanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& result)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_USE_ITEM, !script->OnPlayerCanUseItem(player, proto, result));
+}
+
+bool ScriptMgr::OnPlayerCanAttack(Player* player, Unit* victim)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_ATTACK, !script->OnPlayerCanAttack(player, victim));
 }
 
 bool ScriptMgr::OnPlayerCanSaveEquipNewItem(Player* player, Item* item, uint16 pos, bool update)
@@ -933,6 +943,11 @@ void ScriptMgr::OnPlayerSendListInventory(Player* player, ObjectGuid vendorGuid,
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_SEND_LIST_INVENTORY, script->OnPlayerSendListInventory(player, vendorGuid, vendorEntry));
 }
 
+void ScriptMgr::OnPlayerVendorItemsPrepare(Player* player, Creature* vendor, VendorItemData* vendorItems)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_VENDOR_ITEMS_PREPARE, script->OnPlayerVendorItemsPrepare(player, vendor, vendorItems));
+}
+
 void ScriptMgr::OnPlayerGetReputationPriceDiscount(Player const* player, Creature const* creature, float& discount)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_GET_REPUTATION_PRICE_DISCOUNT, script->OnPlayerGetReputationPriceDiscount(player, creature, discount));
@@ -952,6 +967,16 @@ void ScriptMgr::OnPlayerBeforeGetLevelForXPGain(Player const* player, uint8& lev
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_BEFORE_GET_LEVEL_FOR_XP_GAIN, script->OnPlayerBeforeGetLevelForXPGain(player, level));
     level = std::clamp(level, uint8(1), uint8(sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)));
+}
+
+void ScriptMgr::OnPlayerStandStateChanged(Player* player, uint8 oldState, uint8 newState)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_STAND_STATE_CHANGED, script->OnPlayerStandStateChanged(player, oldState, newState));
+}
+
+bool ScriptMgr::OnPlayerUseBarber(Player* player, GameObject* go, bool apply)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_ON_USE_BARBER, !script->OnPlayerUseBarber(player, go, apply));
 }
 
 PlayerScript::PlayerScript(const char* name, std::vector<uint16> enabledHooks)

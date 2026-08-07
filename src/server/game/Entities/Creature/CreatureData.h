@@ -383,6 +383,7 @@ struct CreatureData : public SpawnData
     uint32 npcflag{0};
     uint32 unit_flags{0};                                      // enum UnitFlags mask values
     uint32 dynamicflags{0};
+    uint32 faction{0};
 };
 
 struct CreatureModelInfo
@@ -443,13 +444,14 @@ typedef std::unordered_map<uint32, CreatureAddon> CreatureAddonContainer;
 // Vendors
 struct VendorItem
 {
-    VendorItem(uint32 _item, int32 _maxcount, uint32 _incrtime, uint32 _ExtendedCost)
-        : item(_item), maxcount(_maxcount), incrtime(_incrtime), ExtendedCost(_ExtendedCost) {}
+    VendorItem(uint32 _item, int32 _maxcount, uint32 _incrtime, uint32 _ExtendedCost, int32 _price = -1)
+        : item(_item), maxcount(_maxcount), incrtime(_incrtime), ExtendedCost(_ExtendedCost), price(_price) {}
 
     uint32 item;
     uint32  maxcount;                                       // 0 for infinity item amount
     uint32 incrtime;                                        // time for restore items amount if maxcount != 0
     uint32 ExtendedCost;
+    int32 price;                                            // -1 = use ItemTemplate::BuyPrice, otherwise overrides it
 
     //helpers
     bool IsGoldRequired(ItemTemplate const* pProto) const { return pProto->HasFlag2(ITEM_FLAG2_DONT_IGNORE_BUY_PRICE) || !ExtendedCost; }
@@ -469,9 +471,19 @@ struct VendorItemData
     }
     [[nodiscard]] bool Empty() const { return m_items.empty(); }
     [[nodiscard]] uint8 GetItemCount() const { return m_items.size(); }
-    void AddItem(uint32 item, int32 maxcount, uint32 ptime, uint32 ExtendedCost)
+    void AddItem(uint32 item, int32 maxcount, uint32 ptime, uint32 ExtendedCost, int32 price = -1)
     {
-        m_items.push_back(new VendorItem(item, maxcount, ptime, ExtendedCost));
+        m_items.push_back(new VendorItem(item, maxcount, ptime, ExtendedCost, price));
+    }
+    // Deep-copies another VendorItemData's items into this one (independent VendorItem instances)
+    void CopyFrom(VendorItemData const* source)
+    {
+        Clear();
+        if (!source)
+            return;
+
+        for (VendorItem const* srcItem : source->m_items)
+            AddItem(srcItem->item, srcItem->maxcount, srcItem->incrtime, srcItem->ExtendedCost, srcItem->price);
     }
     bool RemoveItem(uint32 item_id);
     [[nodiscard]] VendorItem const* FindItemCostPair(uint32 item_id, uint32 extendedCost) const;

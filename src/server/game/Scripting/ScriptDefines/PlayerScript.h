@@ -130,6 +130,7 @@ enum PlayerHook
     PLAYERHOOK_CAN_GROUP_ACCEPT,
     PLAYERHOOK_CAN_SELL_ITEM,
     PLAYERHOOK_CAN_SEND_MAIL,
+    PLAYERHOOK_CAN_BUY_BARBER_STYLE,
     PLAYERHOOK_PETITION_BUY,
     PLAYERHOOK_PETITION_SHOW_LIST,
     PLAYERHOOK_ON_REWARD_KILL_REWARDER,
@@ -161,6 +162,7 @@ enum PlayerHook
     PLAYERHOOK_CAN_EQUIP_ITEM,
     PLAYERHOOK_CAN_UNEQUIP_ITEM,
     PLAYERHOOK_CAN_USE_ITEM,
+    PLAYERHOOK_CAN_ATTACK,
     PLAYERHOOK_CAN_SAVE_EQUIP_NEW_ITEM,
     PLAYERHOOK_CAN_APPLY_ENCHANTMENT,
     PLAYERHOOK_PASSED_QUEST_KILLED_MONSTER_CREDIT,
@@ -215,6 +217,9 @@ enum PlayerHook
     PLAYERHOOK_ON_GET_REPUTATION_PRICE_DISCOUNT,
     PLAYERHOOK_ON_LEARN_TAXI_NODE,
     PLAYERHOOK_ON_BEFORE_GET_LEVEL_FOR_XP_GAIN,
+    PLAYERHOOK_ON_VENDOR_ITEMS_PREPARE,
+    PLAYERHOOK_ON_STAND_STATE_CHANGED,
+    PLAYERHOOK_ON_USE_BARBER,
     PLAYERHOOK_END
 };
 
@@ -585,6 +590,8 @@ public:
 
     [[nodiscard]] virtual bool OnPlayerCanUseItem(Player* /*player*/, ItemTemplate const* /*proto*/, InventoryResult& /*result*/) { return true; }
 
+    [[nodiscard]] virtual bool OnPlayerCanAttack(Player* /*player*/, Unit* /*victim*/) { return true; }
+
     [[nodiscard]] virtual bool OnPlayerCanSaveEquipNewItem(Player* /*player*/, Item* /*item*/, uint16 /*pos*/, bool /*update*/) { return true; }
 
     [[nodiscard]] virtual bool OnPlayerCanApplyEnchantment(Player* /*player*/, Item* /*item*/, EnchantmentSlot /*slot*/, bool /*apply*/, bool /*apply_dur*/, bool /*ignore_condition*/) { return true; }
@@ -615,6 +622,8 @@ public:
     [[nodiscard]] virtual bool OnPlayerNotSetArenaTeamInfoField(Player* /*player*/, uint8 /*slot*/, ArenaTeamInfoType /*type*/, uint32 /*value*/) { return true; } // Whats that?
 
     [[nodiscard]] virtual bool OnPlayerCanJoinLfg(Player* /*player*/, uint8 /*roles*/, std::set<uint32>& /*dungeons*/, const std::string& /*comment*/) { return true; }
+
+    [[nodiscard]] virtual bool OnPlayerCanBuyBarberStyle(Player* /*player*/, uint32 /*cost*/, uint32 /*hair*/, uint32 /*color*/, uint32 /*facialHair*/, uint32 /*skinColor*/) { return true; }
 
     [[nodiscard]] virtual bool OnPlayerCanEnterMap(Player* /*player*/, MapEntry const* /*entry*/, InstanceTemplate const* /*instance*/, MapDifficulty const* /*mapDiff*/, bool /*loginCheck*/) { return true; }
 
@@ -821,6 +830,17 @@ public:
     virtual void OnPlayerSendListInventory(Player* /*player*/, ObjectGuid /*vendorGuid*/, uint32& /*vendorEntry*/) {}
 
     /**
+     * @brief This hook is called after the vendor's item list has been resolved and copied for this player's
+     * session, right before it is sent to the client. The vendorItems copy is scoped to this player only:
+     * adding, removing, or repricing items in it does not affect the vendor's shared item list or other players.
+     *
+     * @param player Contains information about the Player
+     * @param vendor The vendor Creature being interacted with
+     * @param vendorItems The per-session copy of the vendor's item list
+     */
+    virtual void OnPlayerVendorItemsPrepare(Player* /*player*/, Creature* /*vendor*/, VendorItemData* /*vendorItems*/) {}
+
+    /**
      * @brief This hook is called whenever a player attempts to buy items, repair, take taxis, or learn spells. This then uses this information to call OnPlayerGetReputationPriceDiscoun(Player, FactionTemplateEntry, float)
      *
      * @param player Contains information about the Player
@@ -853,6 +873,26 @@ public:
      * @param level The level that should be used for XP gain calculations
      */
     virtual void OnPlayerBeforeGetLevelForXPGain(Player const* /*player*/, uint8& /*level*/) {}
+
+    /**
+     * @brief This hook is called whenever a player's stand state changes (sit, stand, sleep, kneel, ...).
+     *
+     * @param player Contains information about the Player
+     * @param oldState The stand state before the change
+     * @param newState The stand state after the change
+     */
+    virtual void OnPlayerStandStateChanged(Player* /*player*/, uint8 /*oldState*/, uint8 /*newState*/) {}
+
+    /**
+     * @brief This hook is called when a player interacts with a barber chair gameobject.
+     *
+     * @param player Contains information about the Player
+     * @param go The barber chair [GameObject] being used
+     * @param apply False when the player sits down to open the barber shop UI, true right before the chosen style is applied
+     *
+     * @return True to continue with the default action, false to cancel it
+     */
+    [[nodiscard]] virtual bool OnPlayerUseBarber(Player* /*player*/, GameObject* /*go*/, bool /*apply*/) { return true; }
 };
 
 #endif

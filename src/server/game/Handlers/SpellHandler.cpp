@@ -15,6 +15,8 @@
  * with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "Creature.h"
+#include "CreatureOutfit.h"
 #include "DBCStores.h"
 #include "GameObjectAI.h"
 #include "Log.h"
@@ -746,6 +748,30 @@ void WorldSession::HandleMirrorImageDataRequest(WorldPacket& recvData)
     Unit* unit = ObjectAccessor::GetUnit(*_player, guid);
     if (!unit)
         return;
+
+    if (Creature* creature = unit->ToCreature())
+    {
+        if (std::shared_ptr<CreatureOutfit> const& outfit = creature->GetOutfit())
+        {
+            CreatureOutfit const& co = *outfit;
+            WorldPacket data(SMSG_MIRRORIMAGE_DATA, 68);
+            data << guid;
+            data << uint32(co.GetDisplayId());
+            data << uint8(co.GetRace());
+            data << uint8(co.GetGender());
+            data << uint8(co.Class);
+            data << uint8(co.skin);
+            data << uint8(co.face);
+            data << uint8(co.hair);
+            data << uint8(co.haircolor);
+            data << uint8(co.facialhair);
+            data << uint32(co.guild);
+            for (EquipmentSlots slot : CreatureOutfit::item_slots)
+                data << uint32(co.outfitdisplays[slot]);
+            SendPacket(&data);
+            return;
+        }
+    }
 
     if (!unit->HasCloneCasterAura())
         return;

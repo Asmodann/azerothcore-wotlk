@@ -143,6 +143,9 @@ public:
 
     [[nodiscard]] ObjectGuid::LowType GetSpawnId() const { return m_spawnId; }
 
+    // scale <= 0 resets the per-spawn override and falls back to gameobject_template.size
+    void SetObjectScale(float scale) override;
+
     // z_rot, y_rot, x_rot - rotation angles around z, y and x axes
     void SetWorldRotationAngles(float z_rot, float y_rot, float x_rot);
     void SetWorldRotation(G3D::Quat const& rot);

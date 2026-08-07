@@ -57,6 +57,8 @@ void WorldSession::HandleTabardVendorActivateOpcode(WorldPacket& recvData)
         return;
     }
 
+    unit->SendMirrorSound(_player, 0);
+
     // remove fake death
     if (GetPlayer()->HasUnitState(UNIT_STATE_DIED))
         GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);
@@ -86,6 +88,8 @@ void WorldSession::HandleTrainerListOpcode(WorldPackets::NPC::Hello& packet)
         LOG_DEBUG("network", "WorldSession: SendTrainerList - {} not found or you can not interact with him.", packet.Unit.ToString().c_str());
         return;
     }
+
+    npc->SendMirrorSound(_player, 0);
 
     SendTrainerList(npc);
 }
@@ -147,6 +151,8 @@ void WorldSession::HandleGossipHelloOpcode(WorldPacket& recvData)
         LOG_DEBUG("network", "WORLD: HandleGossipHelloOpcode - Unit ({}) not found or you can not interact with him.", guid.ToString());
         return;
     }
+
+    unit->SendMirrorSound(_player, 0);
 
     // xinef: check if we have ANY npc flags
     if (unit->GetNpcFlags() == UNIT_NPC_FLAG_NONE)

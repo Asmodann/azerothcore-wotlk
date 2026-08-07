@@ -90,6 +90,8 @@ void WorldSession::HandleQuestgiverHelloOpcode(WorldPacket& recvData)
         return;
     }
 
+    creature->SendMirrorSound(_player, 0);
+
     // remove fake death
     if (GetPlayer()->HasUnitState(UNIT_STATE_DIED))
         GetPlayer()->RemoveAurasByType(SPELL_AURA_FEIGN_DEATH);

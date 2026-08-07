@@ -13149,6 +13149,7 @@ bool Unit::IsStandUpOnMovementState() const
 
 void Unit::SetStandState(uint8 state)
 {
+    uint8 oldState = getStandState();
     SetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_STAND_STATE, state);
 
     if (IsStandState())
@@ -13159,6 +13160,8 @@ void Unit::SetStandState(uint8 state)
         WorldPacket data(SMSG_STANDSTATE_UPDATE, 1);
         data << (uint8)state;
         ToPlayer()->SendDirectMessage(&data);
+
+        sScriptMgr->OnPlayerStandStateChanged(ToPlayer(), oldState, state);
     }
 }
 

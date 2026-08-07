@@ -865,6 +865,8 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid, uint32 vendorEntry)
         return;
     }
 
+    vendor->SendMirrorSound(_player, 0);
+
     // remove fake death
     if (GetPlayer()->HasUnitState(UNIT_STATE_DIED))
     {
@@ -880,8 +882,16 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid, uint32 vendorEntry)
 
     SetCurrentVendor(vendorEntry);
 
-    VendorItemData const* items = vendorEntry ? sObjectMgr->GetNpcVendorItemList(vendorEntry) : vendor->GetVendorItems();
-    if (!items)
+    VendorItemData const* templateItems = vendorEntry ? sObjectMgr->GetNpcVendorItemList(vendorEntry) : vendor->GetVendorItems();
+
+    // Per-session copy: scripts can freely Add/Remove/Clear items or override prices on this copy
+    // without touching the shared template, so changes only apply to this player's current interaction.
+    ResetVendorItemsSession(templateItems);
+    VendorItemData* items = GetVendorItemsSession();
+
+    sScriptMgr->OnPlayerVendorItemsPrepare(GetPlayer(), vendor, items);
+
+    if (!items || items->Empty())
     {
         WorldPacket data(SMSG_LIST_INVENTORY, 8 + 1 + 1);
         data << vendorGuid;
@@ -899,8 +909,6 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid, uint32 vendorEntry)
 
     std::size_t countPos = data.wpos();
     data << uint8(count);
-
-    float discountMod = _player->GetReputationPriceDiscount(vendor);
 
     for (uint8 slot = 0; slot < itemCount; ++slot)
     {
@@ -933,8 +941,7 @@ void WorldSession::SendListInventory(ObjectGuid vendorGuid, uint32 vendorEntry)
                     continue;
                 }
 
-                // reputation discount
-                int32 price = item->IsGoldRequired(itemTemplate) ? uint32(std::floor(itemTemplate->BuyPrice * discountMod)) : 0;
+                int32 price = item->IsGoldRequired(itemTemplate) ? (item->price >= 0 ? uint32(item->price) : uint32(itemTemplate->BuyPrice)) : 0;
 
                 data << uint32(slot + 1);       // client expects counting to start at 1
                 data << uint32(item->item);

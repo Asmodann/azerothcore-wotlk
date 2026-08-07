@@ -92,7 +92,16 @@ extern DBCStorage <ChrClassesEntry>              sChrClassesStore;
 extern DBCStorage <ChrRacesEntry>                sChrRacesStore;
 extern DBCStorage <CinematicCameraEntry>         sCinematicCameraStore;
 extern DBCStorage <CinematicSequencesEntry>      sCinematicSequencesStore;
-extern DBCStorage <CreatureDisplayInfoEntry>     sCreatureDisplayInfoStore;
+extern DBCStorage <CreatureDisplayInfoEntry>     sCreatureDisplayInfoStoreRaw;
+
+// Wraps sCreatureDisplayInfoStoreRaw and resolves "fake" creature outfit display ids
+// (see CreatureOutfit) to their underlying real DBC display id before lookup.
+struct CreatureDisplayInfoStore
+{
+    CreatureDisplayInfoEntry const* AssertEntry(uint32 id) const;
+    CreatureDisplayInfoEntry const* LookupEntry(uint32 id) const;
+};
+extern CreatureDisplayInfoStore                  sCreatureDisplayInfoStore;
 extern DBCStorage <CreatureDisplayInfoExtraEntry> sCreatureDisplayInfoExtraStore;
 extern DBCStorage <CreatureFamilyEntry>          sCreatureFamilyStore;
 extern DBCStorage <CreatureModelDataEntry>       sCreatureModelDataStore;
@@ -144,6 +153,7 @@ extern MapDifficultyMap                          sMapDifficultyMap;
 extern DBCStorage <MovieEntry>                   sMovieStore;
 extern DBCStorage <NamesReservedEntry>           sNamesReservedStore;
 extern DBCStorage <NamesProfanityEntry>          sNamesProfanityStore;
+extern DBCStorage <NPCSoundsEntry>               sNPCSoundsStore;
 extern DBCStorage <OverrideSpellDataEntry>       sOverrideSpellDataStore;
 extern DBCStorage <PowerDisplayEntry>            sPowerDisplayStore;
 extern DBCStorage <QuestSortEntry>               sQuestSortStore;

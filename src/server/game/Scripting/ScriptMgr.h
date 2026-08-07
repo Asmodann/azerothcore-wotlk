@@ -393,6 +393,9 @@ public: /* PlayerScript */
     bool OnPlayerCanGroupAccept(Player* player, Group* group);
     bool OnPlayerCanSellItem(Player* player, Item* item, Creature* creature);
     bool OnPlayerCanSendMail(Player* player, ObjectGuid receiverGuid, ObjectGuid mailbox, std::string& subject, std::string& body, uint32 money, uint32 COD, Item* item);
+    bool OnPlayerCanBuyBarberStyle(Player* player, uint32 cost, uint32 hair, uint32 color, uint32 facialHair, uint32 skinColor);
+    void OnPlayerStandStateChanged(Player* player, uint8 oldState, uint8 newState);
+    bool OnPlayerUseBarber(Player* player, GameObject* go, bool apply);
     void OnPlayerPetitionBuy(Player* player, Creature* creature, uint32& charterid, uint32& cost, uint32& type);
     void OnPlayerPetitionShowList(Player* player, Creature* creature, uint32& CharterEntry, uint32& CharterDispayID, uint32& CharterCost);
     void OnPlayerRewardKillRewarder(Player* player, KillRewarder* rewarder, bool isDungeon, float& rate);
@@ -424,6 +427,7 @@ public: /* PlayerScript */
     bool OnPlayerCanEquipItem(Player* player, uint8 slot, uint16& dest, Item* pItem, bool swap, bool not_loading);
     bool OnPlayerCanUnequipItem(Player* player, uint16 pos, bool swap);
     bool OnPlayerCanUseItem(Player* player, ItemTemplate const* proto, InventoryResult& result);
+    bool OnPlayerCanAttack(Player* player, Unit* victim);
     bool OnPlayerCanSaveEquipNewItem(Player* player, Item* item, uint16 pos, bool update);
     bool OnPlayerCanApplyEnchantment(Player* player, Item* item, EnchantmentSlot slot, bool apply, bool apply_dur, bool ignore_condition);
     void OnPlayerGetQuestRate(Player* player, float& result);
@@ -467,6 +471,7 @@ public: /* PlayerScript */
     bool OnPlayerCanResurrect(Player* player);
     bool OnPlayerCanGiveLevel(Player* player, uint8 newLevel);
     void OnPlayerSendListInventory(Player* player, ObjectGuid vendorGuid, uint32& vendorEntry);
+    void OnPlayerVendorItemsPrepare(Player* player, Creature* vendor, VendorItemData* vendorItems);
     void OnPlayerGetReputationPriceDiscount(Player const* player, Creature const* creature, float& discount);
     void OnPlayerGetReputationPriceDiscount(Player const* player, FactionTemplateEntry const* factionTemplate, float& discount);
     void OnPlayerLearnTaxiNode(Player const* player, uint32 nodeId);

@@ -25,6 +25,7 @@
 #include "BanMgr.h"
 #include "CharacterPackets.h"
 #include "Common.h"
+#include "CreatureData.h"
 #include "DatabaseEnv.h"
 #include "GameTime.h"
 #include "Group.h"
@@ -181,6 +182,14 @@ WorldSession::~WorldSession()
         delete packet;
 
     LoginDatabase.Execute("UPDATE account SET online = 0 WHERE id = {};", GetAccountId());     // One-time query
+}
+
+void WorldSession::ResetVendorItemsSession(VendorItemData const* source)
+{
+    if (!_vendorItemsSession)
+        _vendorItemsSession = std::make_unique<VendorItemData>();
+
+    _vendorItemsSession->CopyFrom(source);
 }
 
 void WorldSession::UpdateAccountFlag(uint32 flag, bool remove /*= flase*/)
@@ -868,6 +877,12 @@ void WorldSession::Handle_ServerSide(WorldPacket& recvPacket)
 void WorldSession::Handle_Deprecated(WorldPacket& recvPacket)
 {
     LOG_ERROR("network.opcode", "Received deprecated opcode {} from {}",
+        GetOpcodeNameForLogging(static_cast<OpcodeClient>(recvPacket.GetOpcode())), GetPlayerInfo());
+}
+
+void WorldSession::Handle_CustomPacket(WorldPacket& recvPacket)
+{
+    LOG_DEBUG("network.opcode", "Received custom packet opcode {} from {}",
         GetOpcodeNameForLogging(static_cast<OpcodeClient>(recvPacket.GetOpcode())), GetPlayerInfo());
 }
 
