@@ -720,6 +720,7 @@ struct GameObjectData : public SpawnData
     uint32 animprogress{0};
     GOState go_state{GO_STATE_ACTIVE};
     uint8 artKit{0};
+    float size{0.0f};                                            // 0 = use gameobject_template.size
 };
 
 #endif // GameObjectData_h__

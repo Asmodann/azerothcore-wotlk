@@ -78,6 +78,7 @@ public:
     /// For which zone is this weather?
     [[nodiscard]] uint32 GetZone() const { return m_zone; };
     [[nodiscard]] uint32 GetScriptId() const { return m_weatherChances->ScriptId; }
+    [[nodiscard]] uint32 GetWeatherCurrent() const;
 
 private:
     [[nodiscard]] WeatherState GetWeatherState() const;

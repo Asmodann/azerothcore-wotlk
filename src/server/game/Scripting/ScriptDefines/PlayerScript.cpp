@@ -707,6 +707,11 @@ bool ScriptMgr::OnPlayerCanUseItem(Player* player, ItemTemplate const* proto, In
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_USE_ITEM, !script->OnPlayerCanUseItem(player, proto, result));
 }
 
+bool ScriptMgr::OnPlayerCanAttack(Player* player, Unit* victim)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_ATTACK, !script->OnPlayerCanAttack(player, victim));
+}
+
 bool ScriptMgr::OnPlayerCanSaveEquipNewItem(Player* player, Item* item, uint16 pos, bool update)
 {
     CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_CAN_SAVE_EQUIP_NEW_ITEM, !script->OnPlayerCanSaveEquipNewItem(player, item, pos, update));
@@ -938,6 +943,11 @@ void ScriptMgr::OnPlayerSendListInventory(Player* player, ObjectGuid vendorGuid,
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_SEND_LIST_INVENTORY, script->OnPlayerSendListInventory(player, vendorGuid, vendorEntry));
 }
 
+void ScriptMgr::OnPlayerVendorItemsPrepare(Player* player, Creature* vendor, VendorItemData* vendorItems)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_VENDOR_ITEMS_PREPARE, script->OnPlayerVendorItemsPrepare(player, vendor, vendorItems));
+}
+
 void ScriptMgr::OnPlayerGetReputationPriceDiscount(Player const* player, Creature const* creature, float& discount)
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_GET_REPUTATION_PRICE_DISCOUNT, script->OnPlayerGetReputationPriceDiscount(player, creature, discount));
@@ -957,6 +967,16 @@ void ScriptMgr::OnPlayerBeforeGetLevelForXPGain(Player const* player, uint8& lev
 {
     CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_BEFORE_GET_LEVEL_FOR_XP_GAIN, script->OnPlayerBeforeGetLevelForXPGain(player, level));
     level = std::clamp(level, uint8(1), uint8(sWorld->getIntConfig(CONFIG_MAX_PLAYER_LEVEL)));
+}
+
+void ScriptMgr::OnPlayerStandStateChanged(Player* player, uint8 oldState, uint8 newState)
+{
+    CALL_ENABLED_HOOKS(PlayerScript, PLAYERHOOK_ON_STAND_STATE_CHANGED, script->OnPlayerStandStateChanged(player, oldState, newState));
+}
+
+bool ScriptMgr::OnPlayerUseBarber(Player* player, GameObject* go, bool apply)
+{
+    CALL_ENABLED_BOOLEAN_HOOKS(PlayerScript, PLAYERHOOK_ON_USE_BARBER, !script->OnPlayerUseBarber(player, go, apply));
 }
 
 PlayerScript::PlayerScript(const char* name, std::vector<uint16> enabledHooks)

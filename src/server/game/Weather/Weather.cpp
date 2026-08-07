@@ -313,3 +313,8 @@ WeatherState Weather::GetWeatherState() const
             return WEATHER_STATE_FINE;
     }
 }
+
+uint32 Weather::GetWeatherCurrent() const
+{
+    return static_cast<uint32>(GetWeatherState());
+}

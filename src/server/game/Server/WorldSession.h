@@ -48,6 +48,7 @@ class Player;
 class Quest;
 class SpellCastTargets;
 class Unit;
+struct VendorItemData;
 class Warden;
 class WorldPacket;
 class WorldSocket;
@@ -467,6 +468,12 @@ public:
 
     uint32 GetCurrentVendor() const { return m_currentVendorEntry; }
     void SetCurrentVendor(uint32 vendorEntry) { m_currentVendorEntry = vendorEntry; }
+
+    // Per-session copy of the vendor's item list currently open for this player, rebuilt on every
+    // SendListInventory call. Lets scripts adjust prices/stock for this player only, without touching
+    // the shared template returned by ObjectMgr::GetNpcVendorItemList.
+    VendorItemData* GetVendorItemsSession() const { return _vendorItemsSession.get(); }
+    void ResetVendorItemsSession(VendorItemData const* source);
 
     ObjectGuid::LowType GetGuidLow() const;
     void SetSecurity(AccountTypes security) { _security = security; }
@@ -1273,6 +1280,7 @@ private:
     bool isRecruiter;
     LockedQueue<WorldPacket*> _recvQueue;
     uint32 m_currentVendorEntry;
+    std::unique_ptr<VendorItemData> _vendorItemsSession;
     ObjectGuid m_currentBankerGUID;
     uint32 _offlineTime;
     bool _kicked;

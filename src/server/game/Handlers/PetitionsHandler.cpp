@@ -852,6 +852,8 @@ void WorldSession::SendPetitionShowList(ObjectGuid guid)
         return;
     }
 
+    creature->SendMirrorSound(_player, 0);
+
     WorldPacket data(SMSG_PETITION_SHOWLIST, 8 + 1 + 4 * 6);
     data << guid;                                           // npc guid
 

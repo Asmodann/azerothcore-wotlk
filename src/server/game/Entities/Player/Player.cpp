@@ -10355,13 +10355,8 @@ bool Player::ActivateTaxiPathTo(std::vector<uint32> const& nodes, Creature* npc 
         prevnode = lastnode;
     }
 
-    // get mount model (in case non taximaster (npc == nullptr) allow more wide lookup)
-    //
-    // Hack-Fix for Alliance not being able to use Acherus taxi. There is
-    // only one mount ID for both sides. Probably not good to use 315 in case DBC nodes
-    // change but I couldn't find a suitable alternative. OK to use class because only DK
-    // can use this taxi.
-    uint32 mount_display_id = sObjectMgr->GetTaxiMountDisplayId(sourcenode, GetTeamId(true), npc == nullptr || (sourcenode == 315 && IsClass(CLASS_DEATH_KNIGHT, CLASS_CONTEXT_TAXI)));
+    // get mount model, falling back to the other team's mount when ours isn't defined for this node
+    uint32 mount_display_id = sObjectMgr->GetTaxiMountDisplayId(sourcenode, GetTeamId(true), true);
 
     // in spell case allow 0 model
     if ((mount_display_id == 0 && spellid == 0) || sourcepath == 0)
@@ -10770,7 +10765,9 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
         return false;
     }
 
-    VendorItemData const* vItems = GetSession()->GetCurrentVendor() ? sObjectMgr->GetNpcVendorItemList(GetSession()->GetCurrentVendor()) : creature->GetVendorItems();
+    // Use the per-session copy prepared in SendListInventory so what the player bought matches what
+    // was displayed (including any per-player price/stock overrides applied to that copy).
+    VendorItemData const* vItems = GetSession()->GetVendorItemsSession();
     if (!vItems || vItems->Empty())
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
@@ -10850,18 +10847,16 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
     }
 
     uint32 price = 0;
-    if (crItem->IsGoldRequired(pProto) && pProto->BuyPrice > 0) //Assume price cannot be negative (do not know why it is int32)
+    uint32 unitPrice = crItem->price >= 0 ? uint32(crItem->price) : uint32(pProto->BuyPrice); //Assume price cannot be negative (do not know why it is int32)
+    if (crItem->IsGoldRequired(pProto) && unitPrice > 0)
     {
-        uint32 maxCount = MAX_MONEY_AMOUNT / pProto->BuyPrice;
+        uint32 maxCount = MAX_MONEY_AMOUNT / unitPrice;
         if ((uint32)count > maxCount)
         {
             LOG_ERROR("entities.player", "Player {} tried to buy {} item id {}, causing overflow", GetName(), (uint32)count, pProto->ItemId);
             count = (uint8)maxCount;
         }
-        price = pProto->BuyPrice * count; //it should not exceed MAX_MONEY_AMOUNT
-
-        // reputation discount
-        price = uint32(std::floor(price * GetReputationPriceDiscount(creature)));
+        price = unitPrice * count; //it should not exceed MAX_MONEY_AMOUNT
 
         if (!HasEnoughMoney(price))
         {

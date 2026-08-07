@@ -22,6 +22,8 @@
 #include "BattlegroundMgr.h"
 #include "Chat.h"
 #include "CommandScript.h"
+#include "Creature.h"
+#include "CreatureOutfit.h"
 #include "CreatureTextMgr.h"
 #include "DisableMgr.h"
 #include "GameGraveyard.h"
@@ -97,6 +99,7 @@ public:
             { "creature_onkill_reputation",     HandleReloadOnKillReputationCommand,           rbac::RBAC_PERM_COMMAND_RELOAD_CREATURE_ONKILL_REPUTATION, Console::Yes },
             { "creature_queststarter",         HandleReloadCreatureQuestStarterCommand,       rbac::RBAC_PERM_COMMAND_RELOAD_CREATURE_QUESTSTARTER, Console::Yes },
             { "creature_template",             HandleReloadCreatureTemplateCommand,           rbac::RBAC_PERM_COMMAND_RELOAD_CREATURE_TEMPLATE, Console::Yes },
+            { "creature_template_outfits",     HandleReloadCreatureTemplateOutfitsCommand,    rbac::RBAC_PERM_COMMAND_RELOAD_CREATURE_TEMPLATE, Console::Yes },
             { "disables",                      HandleReloadDisablesCommand,                   rbac::RBAC_PERM_COMMAND_RELOAD_DISABLES, Console::Yes },
             { "disenchant_loot_template",      HandleReloadLootTemplatesDisenchantCommand,    rbac::RBAC_PERM_COMMAND_RELOAD_DISENCHANT_LOOT_TEMPLATE, Console::Yes },
             { "event_scripts",                 HandleReloadEventScriptsCommand,               rbac::RBAC_PERM_COMMAND_RELOAD_EVENT_SCRIPTS, Console::Yes },
@@ -265,6 +268,7 @@ public:
         HandleReloadNpcVendorCommand(handler);
         HandleReloadPointsOfInterestCommand(handler);
         HandleReloadSpellClickSpellsCommand(handler);
+        HandleReloadCreatureTemplateOutfitsCommand(handler);
         return true;
     }
 
@@ -490,6 +494,25 @@ public:
         }
 
         handler->SendGlobalGMSysMessage("Creature template reloaded.");
+        return true;
+    }
+
+    static bool HandleReloadCreatureTemplateOutfitsCommand(ChatHandler* handler)
+    {
+        LOG_INFO("server.loading", "Reloading `creature_template_outfits`...");
+        sObjectMgr->LoadCreatureOutfits();
+
+        sMapMgr->DoForAllMaps([](Map* map)
+        {
+            for (auto const& [spawnId, creature] : map->GetCreatureBySpawnIdStore())
+            {
+                std::shared_ptr<CreatureOutfit> const& outfit = creature->GetOutfit();
+                if (outfit && outfit->GetId())
+                    creature->SetDisplayId(outfit->GetId());
+            }
+        });
+
+        handler->SendGlobalGMSysMessage("DB table `creature_template_outfits` reloaded.");
         return true;
     }
 

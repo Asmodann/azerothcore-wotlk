@@ -21,6 +21,7 @@
 #include "ObjectAccessor.h"
 #include "Opcodes.h"
 #include "Player.h"
+#include "ScriptMgr.h"
 #include "Vehicle.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
@@ -60,6 +61,12 @@ void WorldSession::HandleAttackSwingOpcode(WorldPacket& recvData)
             SendAttackStop(pEnemy);
             return;
         }
+    }
+
+    if (!sScriptMgr->OnPlayerCanAttack(_player, pEnemy))
+    {
+        SendAttackStop(pEnemy);
+        return;
     }
 
     _player->Attack(pEnemy, true);

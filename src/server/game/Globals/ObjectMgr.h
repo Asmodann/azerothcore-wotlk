@@ -42,6 +42,7 @@
 #include <memory>
 #include <string>
 
+class CreatureOutfit;
 class Item;
 struct DungeonProgressionRequirements;
 struct PlayerClassInfo;
@@ -760,6 +761,7 @@ public:
     typedef std::map<uint32, uint32> CharacterConversionMap;
 
     typedef std::unordered_map<ObjectGuid::LowType, std::vector<float>> CreatureSparringContainer;
+    typedef std::unordered_map<uint32, std::shared_ptr<CreatureOutfit>> CreatureOutfitContainer;
 
     GameObjectTemplate const* GetGameObjectTemplate(uint32 entry);
     bool IsGameObjectStaticTransport(uint32 entry);
@@ -776,6 +778,11 @@ public:
     CreatureModelInfo const* GetCreatureModelRandomGender(CreatureModel* model, CreatureTemplate const* creatureTemplate) const;
     static CreatureModel const* ChooseDisplayId(CreatureTemplate const* cinfo, CreatureData const* data = nullptr);
     static void ChooseCreatureFlags(CreatureTemplate const* cinfo, uint32& npcflag, uint32& unit_flags, uint32& dynamicflags, CreatureData const* data = nullptr);
+
+    std::shared_ptr<CreatureOutfit> const& GetOutfit(uint32 modelId) const;
+    uint32 GetRealDisplayId(uint32 modelId) const;
+    void LoadCreatureOutfits();
+    [[nodiscard]] CreatureOutfitContainer const& GetCreatureOutfitMap() const { return _creatureOutfitStore; }
     EquipmentInfo const* GetEquipmentInfo(uint32 entry, int8& id);
     CreatureAddon const* GetCreatureAddon(ObjectGuid::LowType lowguid);
     GameObjectAddon const* GetGameObjectAddon(ObjectGuid::LowType lowguid);
@@ -817,7 +824,7 @@ public:
     uint32 GetNearestTaxiNode(float x, float y, float z, uint32 mapid, uint32 teamId);
     uint32 GetNearestTaxiNode(WorldLocation const& loc, uint32 teamId);
     void GetTaxiPath(uint32 source, uint32 destination, uint32& path, uint32& cost);
-    uint32 GetTaxiMountDisplayId(uint32 id, TeamId teamId, bool allowed_alt_team = false);
+    uint32 GetTaxiMountDisplayId(uint32 id, TeamId teamId, bool allowed_alt_team = true);
 
     [[nodiscard]] GameObjectQuestItemList const* GetGameObjectQuestItemList(uint32 id) const
     {
@@ -1455,7 +1462,7 @@ public:
         return &iter->second;
     }
 
-    void AddVendorItem(uint32 entry, uint32 item, uint32 maxcount, uint32 incrtime, uint32 extendedCost, bool persist = true); // for event
+    void AddVendorItem(uint32 entry, uint32 item, uint32 maxcount, uint32 incrtime, uint32 extendedCost, bool persist = true, int32 price = -1); // for event
     bool RemoveVendorItem(uint32 entry, uint32 item, bool persist = true); // for event
     bool IsVendorItemValid(uint32 vendor_entry, uint32 item, uint32 maxcount, uint32 ptime, uint32 ExtendedCost, Player* player = nullptr, std::set<uint32>* skip_vendors = nullptr, uint32 ORnpcflag = 0) const;
 
@@ -1661,6 +1668,7 @@ private:
     CreatureCustomIDsContainer _creatureCustomIDsStore;
     std::vector<CreatureTemplate*> _creatureTemplateStoreFast; // pussywizard
     CreatureModelContainer _creatureModelStore;
+    CreatureOutfitContainer _creatureOutfitStore;
     CreatureAddonContainer _creatureAddonStore;
     CreatureAddonContainer _creatureTemplateAddonStore;
     std::unordered_map<ObjectGuid::LowType, CreatureMovementData> _creatureMovementOverrides;

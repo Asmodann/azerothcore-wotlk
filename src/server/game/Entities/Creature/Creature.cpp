@@ -22,8 +22,10 @@
 #include "CreatureAI.h"
 #include "CreatureAISelector.h"
 #include "CreatureGroups.h"
+#include "CreatureOutfit.h"
 #include "MoveSpline.h"
 #include "DatabaseEnv.h"
+#include "DBCStores.h"
 #include "Formulas.h"
 #include "GameEventMgr.h"
 #include "GameTime.h"
@@ -471,6 +473,54 @@ void Creature::RemoveCorpse(bool setSpawnTime, bool skipVisibility)
     }
 }
 
+void Creature::SetOutfit(std::shared_ptr<CreatureOutfit> const& outfit)
+{
+    if (m_outfit)
+    {
+        // Switching from one outfit to another: delay the new displayid setting
+        // by passing through the invisible model first, so the client is forced
+        // to re-request (and re-render) the Mirror Image data once it becomes visible again.
+        SetDisplayId(CreatureOutfit::invisible_model);
+        m_outfit = outfit;
+    }
+    else
+    {
+        m_outfit = outfit;
+        SetDisplayId(outfit->GetDisplayId());
+    }
+}
+
+void Creature::SetMirrorImageFlag(bool on)
+{
+    if (on)
+        SetUnitFlag2(UNIT_FLAG2_MIRROR_IMAGE);
+    else
+        RemoveUnitFlag2(UNIT_FLAG2_MIRROR_IMAGE);
+}
+
+void Creature::SendMirrorSound(Player* target, uint8 type)
+{
+    std::shared_ptr<CreatureOutfit> const& outfit = GetOutfit();
+    if (!outfit || !outfit->npcsoundsid)
+        return;
+
+    if (NPCSoundsEntry const* npcsounds = sNPCSoundsStore.LookupEntry(outfit->npcsoundsid))
+    {
+        switch (type)
+        {
+            case 0:
+                PlayDistanceSound(npcsounds->hello, target);
+                break;
+            case 1:
+                PlayDistanceSound(npcsounds->goodbye, target);
+                break;
+            case 2:
+                PlayDistanceSound(npcsounds->pissed, target);
+                break;
+        }
+    }
+}
+
 /**
  * change the entry of creature until respawn
  */
@@ -522,12 +572,23 @@ bool Creature::InitEntry(uint32 Entry, const CreatureData* data)
         return false;
     }
 
-    CreatureModel model = *ObjectMgr::ChooseDisplayId(cinfo, data);
-    CreatureModelInfo const* mInfo = sObjectMgr->GetCreatureModelRandomGender(&model, cinfo);
-    if (!mInfo)                                             // Cancel load if no model defined
+    CreatureModel model;
+    if (data && data->displayid && CreatureOutfit::IsFake(data->displayid))
     {
-        LOG_ERROR("sql.sql", "Creature (Entry: {}) has no model {} defined in table `creature_template_model`, can't load. ", Entry, model.CreatureDisplayID);
-        return false;
+        // Per-spawn outfit override: skip the normal template model validation,
+        // the fake id is resolved to a Player-style appearance by Creature::SetDisplayId.
+        model.CreatureDisplayID = data->displayid;
+        model.DisplayScale = 1.0f;
+    }
+    else
+    {
+        model = *ObjectMgr::ChooseDisplayId(cinfo, data);
+        CreatureModelInfo const* mInfo = sObjectMgr->GetCreatureModelRandomGender(&model, cinfo);
+        if (!mInfo)                                             // Cancel load if no model defined
+        {
+            LOG_ERROR("sql.sql", "Creature (Entry: {}) has no model {} defined in table `creature_template_model`, can't load. ", Entry, model.CreatureDisplayID);
+            return false;
+        }
     }
 
     SetDisplayId(model.CreatureDisplayID, model.DisplayScale);
@@ -591,7 +652,7 @@ bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data, bool changele
     if (!GetCreatureAddon())
         SetSheath(SHEATH_STATE_MELEE);
 
-    SetFaction(cInfo->faction);
+    SetFaction((data && data->faction) ? data->faction : cInfo->faction);
 
     uint32 npcflag, unit_flags, dynamicflags;
     ObjectMgr::ChooseCreatureFlags(cInfo, npcflag, unit_flags, dynamicflags, data);
@@ -610,6 +671,10 @@ bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data, bool changele
     ReplaceAllUnitFlags2(UnitFlags2(cInfo->unit_flags2));
 
     ReplaceAllDynamicFlags(dynamicflags);
+
+    // ReplaceAllUnitFlags2() above just overwrote UNIT_FLAG2_MIRROR_IMAGE if InitEntry() set it
+    if (m_outfit && Unit::GetDisplayId() == m_outfit->GetDisplayId())
+        SetMirrorImageFlag(true);
 
     if (cInfo->HasFlagsExtra(CREATURE_FLAG_EXTRA_USE_OFFHAND_ATTACK))
         SetDualWieldMode(DualWieldMode::ENABLED);
@@ -705,6 +770,13 @@ bool Creature::UpdateEntry(uint32 Entry, const CreatureData* data, bool changele
 
 void Creature::Update(uint32 diff)
 {
+    if (m_outfit && !_changesMask.GetBit(UNIT_FIELD_DISPLAYID) && Unit::GetDisplayId() == CreatureOutfit::invisible_model)
+    {
+        // outfit switch was deferred via the invisible model (see SetOutfit); the invisible
+        // model update has now been flushed to clients, apply the real outfit display.
+        SetDisplayId(m_outfit->GetDisplayId());
+    }
+
     if (IsAIEnabled && TriggerJustRespawned && getDeathState() != DeathState::Dead)
     {
         TriggerJustRespawned = false;
@@ -1404,6 +1476,7 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     uint32 npcflag = GetNpcFlags();
     uint32 unit_flags = GetUnitFlags();
     uint32 dynamicflags = GetDynamicFlags();
+    uint32 faction = GetFaction();
 
     // check if it's a custom model and if not, use 0 for displayId
     CreatureTemplate const* cinfo = GetCreatureTemplate();
@@ -1421,6 +1494,9 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
 
         if (dynamicflags == cinfo->dynamicflags)
             dynamicflags = 0;
+
+        if (faction == cinfo->faction)
+            faction = 0;
     }
 
     data.id = GetEntry();
@@ -1456,6 +1532,7 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     data.npcflag = npcflag;
     data.unit_flags = unit_flags;
     data.dynamicflags = dynamicflags;
+    data.faction = faction;
 
     // update in DB
     WorldDatabaseTransaction trans = WorldDatabase.BeginTransaction();
@@ -1486,6 +1563,7 @@ void Creature::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask)
     stmt->SetData(index++, npcflag);
     stmt->SetData(index++, unit_flags);
     stmt->SetData(index++, dynamicflags);
+    stmt->SetData(index++, faction);
     trans->Append(stmt);
 
     WorldDatabase.CommitTransaction(trans);
@@ -3524,13 +3602,46 @@ void Creature::SetObjectScale(float scale)
     SetFloatValue(UNIT_FIELD_COMBATREACH, combatReach * scale);
 }
 
-void Creature::SetDisplayId(uint32 modelId, float displayScale /*= 1.f*/)
+uint32 Creature::GetDisplayId() const
 {
-    Unit::SetDisplayId(modelId, displayScale);
+    if (m_outfit && m_outfit->GetId())
+        return m_outfit->GetId();
+    return Unit::GetDisplayId();
+}
+
+void Creature::SetDisplayId(uint32 displayId, float displayScale /*= 1.f*/)
+{
+    if (std::shared_ptr<CreatureOutfit> const& outfit = sObjectMgr->GetOutfit(displayId))
+    {
+        SetOutfit(outfit);
+        return;
+    }
+
+    if (m_outfit)
+    {
+        if (displayId != m_outfit->GetDisplayId())
+        {
+            // real model being set no longer matches the outfit: drop it
+            m_outfit.reset();
+            SetMirrorImageFlag(false);
+        }
+        else
+        {
+            // outfit's own real model being set: keep showing the outfit
+            SetMirrorImageFlag(true);
+        }
+    }
+
+    SetDisplayIdRaw(displayId, displayScale);
+}
+
+void Creature::SetDisplayIdRaw(uint32 displayId, float displayScale /*= 1.f*/)
+{
+    Unit::SetDisplayId(displayId, displayScale);
 
     float combatReach = DEFAULT_WORLD_OBJECT_SIZE;
 
-    if (CreatureModelInfo const* minfo = sObjectMgr->GetCreatureModelInfo(modelId))
+    if (CreatureModelInfo const* minfo = sObjectMgr->GetCreatureModelInfo(displayId))
     {
         SetFloatValue(UNIT_FIELD_BOUNDINGRADIUS, (IsPet() ? 1.0f : minfo->bounding_radius) * GetObjectScale());
         if (minfo->combat_reach > 0)

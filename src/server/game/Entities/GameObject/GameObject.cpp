@@ -318,7 +318,7 @@ bool GameObject::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* map, u
 
     SetTransportPathRotation(parentRotation.x, parentRotation.y, parentRotation.z, parentRotation.w);
 
-    SetObjectScale(goinfo->size);
+    Object::SetObjectScale(goinfo->size);
 
     if (GameObjectTemplateAddon const* templateAddon = GetTemplateAddon())
     {
@@ -1015,6 +1015,32 @@ void GameObject::GetFishLoot(Loot* fishLoot, Player* lootOwner, bool junk /*= fa
     }
 }
 
+void GameObject::SetObjectScale(float scale)
+{
+    // scale <= 0 means "no per-spawn override", fall back to the template's default size
+    bool const isReset = scale <= 0.0f;
+    if (isReset)
+        scale = GetGOInfo()->size;
+
+    Object::SetObjectScale(scale);
+
+    // only DB-spawned gameobjects have a persistent size override to update
+    if (m_spawnId)
+    {
+        sObjectMgr->NewGOData(m_spawnId).size = isReset ? 0.0f : scale;
+        SaveToDB();
+    }
+
+    // WotLK clients bake a GO's model scale in at CreateObject time and ignore
+    // later incremental OBJECT_FIELD_SCALE_X updates, unlike units - force a
+    // resend so players already seeing this object pick up the new scale
+    if (IsInWorld())
+    {
+        DestroyForVisiblePlayers();
+        UpdateObjectVisibility();
+    }
+}
+
 void GameObject::SaveToDB(bool saveAddon /*= false*/)
 {
     // this should only be used when the gameobject has already been loaded
@@ -1082,6 +1108,7 @@ void GameObject::SaveToDB(uint32 mapid, uint8 spawnMask, uint32 phaseMask, bool 
     stmt->SetData(index++, int32(m_respawnDelayTime));
     stmt->SetData(index++, GetGoAnimProgress());
     stmt->SetData(index++, uint8(GetGoState()));
+    stmt->SetData(index++, data.size);
     trans->Append(stmt);
 
     if (saveAddon && !sObjectMgr->GetGameObjectAddon(m_spawnId))
@@ -1128,6 +1155,9 @@ bool GameObject::LoadGameObjectFromDB(ObjectGuid::LowType spawnId, Map* map, boo
 
     if (!Create(map->GenerateLowGuid<HighGuid::GameObject>(), entry, map, phaseMask, x, y, z, ang, data->rotation, animprogress, go_state, artKit))
         return false;
+
+    if (data->size > 0.0f)
+        Object::SetObjectScale(data->size);
 
     if (data->spawntimesecs >= 0)
     {
@@ -2034,6 +2064,9 @@ void GameObject::Use(Unit* user)
                     return;
 
                 Player* player = user->ToPlayer();
+
+                if (!sScriptMgr->OnPlayerUseBarber(player, this, false))
+                    return;
 
                 // fallback, will always work
                 player->TeleportTo(GetMapId(), GetPositionX(), GetPositionY(), GetPositionZ(), GetOrientation(), TELE_TO_NOT_LEAVE_TRANSPORT | TELE_TO_NOT_LEAVE_COMBAT | TELE_TO_NOT_UNSUMMON_PET);

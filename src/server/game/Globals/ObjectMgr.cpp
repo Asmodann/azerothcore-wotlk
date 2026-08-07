@@ -24,6 +24,7 @@
 #include "Config.h"
 #include "Containers.h"
 #include "CreatureAIFactory.h"
+#include "CreatureOutfit.h"
 #include "DBCStructure.h"
 #include "DatabaseEnv.h"
 #include "DisableMgr.h"
@@ -1634,11 +1635,131 @@ void ObjectMgr::LoadCreatureMovementOverrides()
 
 CreatureModelInfo const* ObjectMgr::GetCreatureModelInfo(uint32 modelId) const
 {
+    modelId = GetRealDisplayId(modelId);
     CreatureModelContainer::const_iterator itr = _creatureModelStore.find(modelId);
     if (itr != _creatureModelStore.end())
         return &(itr->second);
 
     return nullptr;
+}
+
+std::shared_ptr<CreatureOutfit> const& ObjectMgr::GetOutfit(uint32 modelId) const
+{
+    static std::shared_ptr<CreatureOutfit> const empty;
+    if (CreatureOutfit::IsFake(modelId))
+    {
+        CreatureOutfitContainer::const_iterator itr = _creatureOutfitStore.find(modelId);
+        if (itr != _creatureOutfitStore.end())
+            return itr->second;
+    }
+    return empty;
+}
+
+uint32 ObjectMgr::GetRealDisplayId(uint32 modelId) const
+{
+    if (std::shared_ptr<CreatureOutfit> const& outfit = GetOutfit(modelId))
+        return outfit->GetDisplayId();
+    return modelId;
+}
+
+void ObjectMgr::LoadCreatureOutfits()
+{
+    uint32 oldMSTime = getMSTime();
+    _creatureOutfitStore.clear();
+
+    QueryResult result = WorldDatabase.Query("SELECT entry, npcsoundsid, race, class, gender, skin, face, hair, haircolor, facialhair, "
+        "head, shoulders, body, chest, waist, "
+        "legs, feet, wrists, hands, back, tabard, "
+        "guildid FROM creature_template_outfits");
+    if (!result)
+    {
+        LOG_INFO("server.loading", ">> Loaded 0 creature outfits. DB table `creature_template_outfits` is empty.");
+        LOG_INFO("server.loading", " ");
+        return;
+    }
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 i = 0;
+        uint32 entry = fields[i++].Get<uint32>();
+        if (!CreatureOutfit::IsFake(entry))
+        {
+            LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has too low entry (entry <= {}). Ignoring.", entry, CreatureOutfit::max_real_modelid);
+            continue;
+        }
+
+        std::shared_ptr<CreatureOutfit> co(new CreatureOutfit());
+        co->id = entry;
+        co->npcsoundsid = fields[i++].Get<uint32>();
+        if (co->npcsoundsid && !sNPCSoundsStore.LookupEntry(co->npcsoundsid))
+        {
+            LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has incorrect npcsoundsid ({}). Using 0.", entry, co->npcsoundsid);
+            co->npcsoundsid = 0;
+        }
+
+        co->race = fields[i++].Get<uint8>();
+        ChrRacesEntry const* rEntry = sChrRacesStore.LookupEntry(co->race);
+        if (!rEntry)
+        {
+            LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has incorrect race ({}).", entry, uint32(co->race));
+            continue;
+        }
+
+        co->Class = fields[i++].Get<uint8>();
+        if (!sChrClassesStore.LookupEntry(co->Class))
+        {
+            LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has incorrect class ({}).", entry, uint32(co->Class));
+            continue;
+        }
+
+        co->gender = fields[i++].Get<uint8>();
+        switch (co->gender)
+        {
+            case GENDER_FEMALE: co->displayId = rEntry->model_f; break;
+            case GENDER_MALE:   co->displayId = rEntry->model_m; break;
+            default:
+                LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has invalid gender {}.", entry, uint32(co->gender));
+                continue;
+        }
+
+        co->skin = fields[i++].Get<uint8>();
+        co->face = fields[i++].Get<uint8>();
+        co->hair = fields[i++].Get<uint8>();
+        co->haircolor = fields[i++].Get<uint8>();
+        co->facialhair = fields[i++].Get<uint8>();
+
+        for (EquipmentSlots slot : CreatureOutfit::item_slots)
+        {
+            int32 displayInfo = fields[i++].Get<int32>();
+            if (displayInfo > 0) // item entry
+            {
+                uint32 itemEntry = static_cast<uint32>(displayInfo);
+                if (ItemTemplate const* proto = GetItemTemplate(itemEntry))
+                    co->outfitdisplays[slot] = proto->DisplayInfoID;
+                else if (ItemEntry const* dbcEntry = sItemStore.LookupEntry(itemEntry))
+                    co->outfitdisplays[slot] = dbcEntry->DisplayInfoID;
+                else
+                {
+                    LOG_ERROR("sql.sql", "Outfit entry {} in `creature_template_outfits` has invalid item entry: {}. Ignoring.", entry, itemEntry);
+                    co->outfitdisplays[slot] = 0;
+                }
+            }
+            else // raw display id, negated
+            {
+                co->outfitdisplays[slot] = static_cast<uint32>(-displayInfo);
+            }
+        }
+
+        co->guild = fields[i++].Get<uint32>();
+
+        _creatureOutfitStore[co->id] = std::move(co);
+        ++count;
+    } while (result->NextRow());
+
+    LOG_INFO("server.loading", ">> Loaded {} creature outfits in {} ms", count, GetMSTimeDiffToNow(oldMSTime));
+    LOG_INFO("server.loading", " ");
 }
 
 CreatureModel const* ObjectMgr::ChooseDisplayId(CreatureTemplate const* cinfo, CreatureData const* data /*= nullptr*/)
@@ -2325,8 +2446,8 @@ void ObjectMgr::LoadCreatures()
     QueryResult result = WorldDatabase.Query("SELECT creature.guid, id, map, equipment_id, position_x, position_y, position_z, orientation, spawntimesecs, wander_distance, "
                          //      10            11       12          13           14         15         16          17             18                 19                    20
                          "currentwaypoint, curhealth, curmana, MovementType, spawnMask, phaseMask, eventEntry, pool_entry, creature.npcflag, creature.unit_flags, creature.dynamicflags, "
-                         //       21
-                         "creature.ScriptName "
+                         //       21                22
+                         "creature.faction, creature.ScriptName "
                          "FROM creature "
                          "LEFT OUTER JOIN game_event_creature ON creature.guid = game_event_creature.guid "
                          "LEFT OUTER JOIN pool_creature ON creature.guid = pool_creature.guid");
@@ -2386,7 +2507,8 @@ void ObjectMgr::LoadCreatures()
         data.npcflag            = fields[18].Get<uint32>();
         data.unit_flags         = fields[19].Get<uint32>();
         data.dynamicflags       = fields[20].Get<uint32>();
-        data.ScriptId           = GetScriptId(fields[21].Get<std::string>());
+        data.faction            = fields[21].Get<uint32>();
+        data.ScriptId           = GetScriptId(fields[22].Get<std::string>());
         data.spawnGroupId       = 0;
 
         if (!data.ScriptId)
@@ -2898,6 +3020,7 @@ ObjectGuid::LowType ObjectMgr::AddCreData(uint32 entry, uint32 mapId, float x, f
     data.npcflag = cInfo->npcflag;
     data.unit_flags = cInfo->unit_flags;
     data.dynamicflags = cInfo->dynamicflags;
+    data.faction = cInfo->faction;
 
     AddCreatureToGrid(spawnId, &data);
 
@@ -2924,8 +3047,8 @@ void ObjectMgr::LoadGameobjects()
     QueryResult result = WorldDatabase.Query("SELECT gameobject.guid, id, map, position_x, position_y, position_z, orientation, "
                          //   7          8          9          10         11             12            13     14         15         16          17
                          "rotation0, rotation1, rotation2, rotation3, spawntimesecs, animprogress, state, spawnMask, phaseMask, eventEntry, pool_entry, "
-                         //   18
-                         "ScriptName "
+                         //   18          19
+                         "ScriptName, size "
                          "FROM gameobject LEFT OUTER JOIN game_event_gameobject ON gameobject.guid = game_event_gameobject.guid "
                          "LEFT OUTER JOIN pool_gameobject ON gameobject.guid = pool_gameobject.guid");
 
@@ -3014,6 +3137,7 @@ void ObjectMgr::LoadGameobjects()
 
         data.animprogress   = fields[12].Get<uint8>();
         data.artKit         = 0;
+        data.size           = fields[19].Get<float>();
 
         uint32 go_state     = fields[13].Get<uint8>();
         if (go_state >= MAX_GO_STATE)
@@ -7270,7 +7394,9 @@ uint32 ObjectMgr::GetNearestTaxiNode(float x, float y, float z, uint32 mapid, ui
     {
         TaxiNodesEntry const* node = sTaxiNodesStore.LookupEntry(i);
 
-        if (!node || node->map_id != mapid || (!node->MountCreatureID[teamId == TEAM_ALLIANCE ? 1 : 0] && node->MountCreatureID[0] != 32981)) // dk flight
+        // Cross-faction: a node is reachable as long as either side has a mount defined for it,
+        // GetTaxiMountDisplayId() falls back to the other team's mount model when ours is missing.
+        if (!node || node->map_id != mapid || (!node->MountCreatureID[0] && !node->MountCreatureID[1]))
             continue;
 
         uint8  field   = (uint8)((i - 1) / 32);
@@ -7326,7 +7452,7 @@ void ObjectMgr::GetTaxiPath(uint32 source, uint32 destination, uint32& path, uin
     path = dest_i->second->ID;
 }
 
-uint32 ObjectMgr::GetTaxiMountDisplayId(uint32 id, TeamId teamId, bool allowed_alt_team /* = false */)
+uint32 ObjectMgr::GetTaxiMountDisplayId(uint32 id, TeamId teamId, bool allowed_alt_team /* = true */)
 {
     CreatureModel mountModel;
     CreatureTemplate const* mount_info = nullptr;
@@ -10251,13 +10377,14 @@ int ObjectMgr::LoadReferenceVendor(int32 vendor, int32 item, std::set<uint32>* s
             uint32  maxcount    = fields[1].Get<uint32>();
             uint32 incrtime     = fields[2].Get<uint32>();
             uint32 ExtendedCost = fields[3].Get<uint32>();
+            int32 price         = fields[4].Get<int32>();
 
             if (!IsVendorItemValid(vendor, item_id, maxcount, incrtime, ExtendedCost, nullptr, skip_vendors))
                 continue;
 
             VendorItemData& vList = _cacheVendorItemStore[vendor];
 
-            vList.AddItem(item_id, maxcount, incrtime, ExtendedCost);
+            vList.AddItem(item_id, maxcount, incrtime, ExtendedCost, price);
             ++count;
         }
     } while (result->NextRow());
@@ -10276,7 +10403,7 @@ void ObjectMgr::LoadVendors()
 
     std::set<uint32> skip_vendors;
 
-    QueryResult result = WorldDatabase.Query("SELECT entry, item, maxcount, incrtime, ExtendedCost FROM npc_vendor ORDER BY entry, slot ASC, item, ExtendedCost");
+    QueryResult result = WorldDatabase.Query("SELECT entry, item, maxcount, incrtime, ExtendedCost, price FROM npc_vendor ORDER BY entry, slot ASC, item, ExtendedCost");
     if (!result)
     {
         LOG_INFO("server.loading", " ");
@@ -10301,13 +10428,14 @@ void ObjectMgr::LoadVendors()
             uint32 maxcount     = fields[2].Get<uint32>();
             uint32 incrtime     = fields[3].Get<uint32>();
             uint32 ExtendedCost = fields[4].Get<uint32>();
+            int32 price         = fields[5].Get<int32>();
 
             if (!IsVendorItemValid(entry, item_id, maxcount, incrtime, ExtendedCost, nullptr, &skip_vendors))
                 continue;
 
             VendorItemData& vList = _cacheVendorItemStore[entry];
 
-            vList.AddItem(item_id, maxcount, incrtime, ExtendedCost);
+            vList.AddItem(item_id, maxcount, incrtime, ExtendedCost, price);
             ++count;
         }
     } while (result->NextRow());
@@ -10447,10 +10575,10 @@ void ObjectMgr::LoadGossipMenuItems()
     LOG_INFO("server.loading", " ");
 }
 
-void ObjectMgr::AddVendorItem(uint32 entry, uint32 item, uint32 maxcount, uint32 incrtime, uint32 extendedCost, bool persist /*= true*/)
+void ObjectMgr::AddVendorItem(uint32 entry, uint32 item, uint32 maxcount, uint32 incrtime, uint32 extendedCost, bool persist /*= true*/, int32 price /*= -1*/)
 {
     VendorItemData& vList = _cacheVendorItemStore[entry];
-    vList.AddItem(item, maxcount, incrtime, extendedCost);
+    vList.AddItem(item, maxcount, incrtime, extendedCost, price);
 
     if (persist)
     {
@@ -10461,6 +10589,7 @@ void ObjectMgr::AddVendorItem(uint32 entry, uint32 item, uint32 maxcount, uint32
         stmt->SetData(2, maxcount);
         stmt->SetData(3, incrtime);
         stmt->SetData(4, extendedCost);
+        stmt->SetData(5, price);
 
         WorldDatabase.Execute(stmt);
     }
